@@ -2,51 +2,38 @@
 <html lang="ru">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>СберИндекс · муниципалитеты</title>
-<style>
-{ATLAS_CSS}
-</style>
-
-<header>
-    <h1>Динамические соседства муниципалитетов</h1>
-    <p>Месяцы 2024 · 1774 МО · экономическое сходство, не потоки покупателей</p>
-    <p class="small">Семь потребительских координат · адаптивный граф и EWMA.
-        K выбирается по 2023; годовые показатели 2024 проверяют результат.</p>
-</header>
-
-{SUMMARY}
-
-<div class="controls" id="explore">
-    <label>Месяц <select id="month"></select></label>
-    <label>Метод <select id="method"></select></label>
-    <label>Вид
-        <select id="mode">
-            <option value="map">Карта</option>
-            <option value="graph">Граф сходства основного метода</option>
-        </select>
-    </label>
-    <button id="play">▶ По месяцам</button>
-    <input id="search" placeholder="Название или ID муниципалитета"
-        aria-label="Поиск муниципалитета">
-</div>
-
-<main>
-    <section class="visual">
-        <div id="legend"></div>
-        <div id="study" class="small"></div>
-        <svg id="map" role="img" aria-label="Карта муниципалитетов"></svg>
-        <canvas id="graph" style="display:none" aria-label="Граф экономического сходства"></canvas>
-        <div id="searchResults"></div>
-    </section>
-    <aside class="card">
-        <h2 id="name">Выберите муниципалитет</h2>
-        <div id="details">
-            <p>Нажмите на карту, узел графа или введите название.</p>
+<title>СберИндекс · атлас муниципалитетов</title>
+<style>{ATLAS_CSS}</style>
+<header class="masthead"><strong>СберИндекс</strong><span>Атлас муниципалитетов · 2023–2024</span><a href="#methodology">Результаты и методика</a></header>
+<section class="explorer" id="explore" aria-labelledby="explorer-title">
+    <div class="page-heading"><div><p class="eyebrow">Динамика потребительских групп</p><h1 id="explorer-title">Один период. Три представления.</h1><p>Экономическое сходство муниципалитетов и переходы между группами</p></div><span id="coverage" class="small"></span></div>
+    <div class="controls">
+        <label>Число групп <select id="k"></select></label>
+        <label>Вид <select id="mode"><option value="plots">Граф, PCA и t-SNE</option><option value="map">Карта</option></select></label>
+        <label class="search-field">Муниципалитет <input id="search" placeholder="Название или ID" type="search"></label>
+    </div>
+    <div id="searchResults" aria-label="Результаты поиска"></div>
+    <div class="timeline"><div class="timeline-heading"><label for="month">Период</label><output id="period" for="month" aria-live="polite"></output></div><input id="month" type="range" min="0" max="23" step="0.01" value="0" aria-label="Период"><div id="timelineTicks" class="timeline-ticks" aria-hidden="true"></div></div>
+    <p id="study" class="small"></p>
+    <div class="explore-layout" id="exploreLayout">
+        <div class="visual">
+            <div class="plots" id="plots">
+                <section class="plot"><div class="plot-heading"><h2>Граф сходства</h2><span>Общая раскладка</span></div><canvas id="graph" role="img" aria-label="Граф сходства муниципалитетов"></canvas><p class="small">Позиции постоянны · связи и группы меняются</p></section>
+                <section class="plot"><div class="plot-heading"><h2>PCA</h2><span>Общий базис</span></div><canvas id="pca" role="img" aria-label="Потребительские профили в пространстве PCA"></canvas><p id="pcaVariance" class="small"></p></section>
+                <section class="plot"><div class="plot-heading"><h2>t-SNE</h2><span>Общее вложение</span></div><canvas id="tsne" role="img" aria-label="Потребительские профили в общем пространстве t-SNE"></canvas><p class="small">Общее пространство для всех месяцев</p></section>
+            </div>
+            <svg id="map" role="img" aria-label="Карта муниципалитетов" hidden></svg>
+            <div id="legend" class="legend"></div>
         </div>
-    </aside>
-</main>
-
-<script>
-{ATLAS_JS}
-</script>
+        <aside class="municipality-card" id="municipalityCard" hidden><div class="card-heading"><h2 id="name"></h2><button type="button" id="closeDetails" aria-label="Закрыть карточку муниципалитета">Закрыть</button></div><div id="details"></div></aside>
+    </div>
+    <section class="transitions" aria-labelledby="flows-title">
+        <div class="section-heading"><div><h2 id="flows-title">Переходы за весь период</h2><p id="flowsDescription" class="small"></p></div><span class="small">Толщина ленты — число МО</span></div>
+        <div id="flows"></div>
+        <div class="transition-detail"><div><p class="eyebrow">Выбранный переход</p><h3 id="transitionPeriod"></h3><p id="switchCount"></p><p class="small">Строки — прежняя группа, столбцы — новая.</p></div><div class="table-scroll"><table id="transitionMatrix"><caption class="sr-only">Число муниципалитетов по направлениям перехода</caption><thead></thead><tbody></tbody></table></div></div>
+    </section>
+    <p class="footnote">Промежуточные кадры интерполированы между месячными наблюдениями. Переход — смена группы, а не миграция людей или движение денег.</p>
+</section>
+<details id="methodology"><summary>Результаты исследования и методика</summary>{SUMMARY}</details>
+<script>{ATLAS_JS}</script>
 </html>
