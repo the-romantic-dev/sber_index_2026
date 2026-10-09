@@ -76,8 +76,11 @@ def run(config):
             **study,
         )
         if config.get('context', {}).get('enabled', False):
-            from . import context
-            results['context'] = context.run_context(results, config)
+            if (config['data_dir'] / 'context').is_dir():
+                from . import context
+                results['context'] = context.run_context(results, config)
+            else:
+                print('Внешний контекст пропущен: нет data/context (см. data/README.md)', flush=True)
         graph_xy, edges = save_figures(results, output_dir, config)
         save_tables(results, output_dir, config)
         write_cluster_report(results, output_dir, config)

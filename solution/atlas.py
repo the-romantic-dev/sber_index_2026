@@ -1,15 +1,72 @@
 """Интерактивная презентация с картой, временными группами и экономическими профилями."""
 import base64
+import hashlib
 import json
-
-import pandas as pd
 from html import escape
 from pathlib import Path
 
-from . import METHOD
+import numpy as np
+import pandas as pd
+from scipy import sparse
+from sklearn import __version__ as sklearn_version
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from threadpoolctl import threadpool_limits
+
 from .reporting import clean_json
 
 TEMPLATES = Path(__file__).parent / 'templates'
+
+
+def temporal_views(results, edges, output_dir, config):
+    """Общие проекции и согласованные группы/графы за оба года, без повторной кластеризации."""
+    cube = np.asarray(results['smoothed'])
+    months = np.asarray(results['months_all'])
+    n = len(results['ids'])
+    if cube.ndim != 3 or cube.shape[:2] != (len(months), n) or not np.isfinite(cube).all():
+        raise ValueError('Признаки атласа должны быть конечными и соответствовать месяцам и МО')
+    labels_by_k = {
+        k: np.concatenate([results['training_runs'][k]['labels'], run['labels']])
+        for k, run in results['study_runs'].items()
+    }
+    if any(labels.shape != cube.shape[:2] or not np.isfinite(labels).all()
+           or (labels < 0).any() or (labels != np.floor(labels)).any()
+           or any(len(np.unique(month)) != k for month in labels)
+           for k, labels in labels_by_k.items()):
+        raise ValueError('Группы атласа должны соответствовать всем месяцам и МО')
+    training = results['training_runs'][results['selected_k']]
+    if len(training['graphs']) + len(edges) != len(months):
+        raise ValueError('Граф атласа требуется для каждого месяца')
+    training_edges = []
+    for graph in training['graphs']:
+        upper = sparse.triu(graph, k=1).tocoo()
+        training_edges.append(np.column_stack([upper.row, upper.col, upper.data]))
+
+    signature = hashlib.sha256(cube.tobytes() + (
+        f'{cube.shape}:{len(training["labels"])}:{config["random_seed"]}:{sklearn_version}:pca-tsne600-v1'
+    ).encode()).hexdigest()
+    cache_path = output_dir / 'atlas_projections.npz'
+    projections = None
+    if cache_path.exists():
+        with np.load(cache_path, allow_pickle=False) as cache:
+            if str(cache['signature']) == signature:
+                projections = {key: cache[key] for key in ['pca_xy', 'pca_variance', 'tsne_xy']}
+    if projections is None:
+        with threadpool_limits(limits=config.get('runtime', {}).get('threads', 1)):
+            pca = PCA(2, random_state=config['random_seed']).fit(
+                cube[:len(training['labels'])].reshape(-1, cube.shape[-1]))
+            pca_xy = pca.transform(cube.reshape(-1, cube.shape[-1])).reshape(*cube.shape[:2], 2)
+            print(f'Атлас: общее t-SNE для {len(months)} месяцев, {n} МО', flush=True)
+            tsne_xy = TSNE(n_components=2, perplexity=min(30, len(months) * n - 1),
+                           max_iter=600, init='pca', random_state=config['random_seed'], n_jobs=1
+                           ).fit_transform(cube.reshape(-1, cube.shape[-1])).reshape(*cube.shape[:2], 2)
+        projections = dict(pca_xy=np.round(pca_xy, 4),
+                           pca_variance=np.round(100 * pca.explained_variance_ratio_, 1),
+                           tsne_xy=np.round(tsne_xy, 3))
+        np.savez_compressed(cache_path, signature=signature, **projections)
+    return dict(months=months, labels_by_k=labels_by_k,
+                graph_edges=[np.round(month, 4) for month in [*training_edges, *edges]],
+                **projections)
 
 
 def presentation_summary(results, config, output_dir):
@@ -67,45 +124,28 @@ def presentation_summary(results, config, output_dir):
     </section>'''
 
 
-ATLAS_RESEARCH = ['research_kmeans_v5', 'research_anchored_real', 'research_archetypes',
-                  'research_dgi', 'research_dmon', 'research_evolvegcn', 'research_gconvgru']
-
-
-def context_research(results):
-    """Метки исследовательских методов для переключателя карты (если контекст рассчитан)."""
-    context = results.get('context')
-    if context is None:
-        return {}
-    return {name: context['research'][name] for name in ATLAS_RESEARCH if name in context['research']}
+CONTEXT_COLUMNS = [
+    'Население 2024, тыс.', 'Реальный рост трат (ИПЦ региона), %', 'Ускорение во II пол. 2024, п.п.',
+    'Индекс доступности рынков', 'Индекс мобильности 2024, км (СЗФО)', 'Ночные огни VIIRS на жителя (log)',
+]
 
 
 def context_layers(results, context):
-    """Слои контекстного блока: методы исследования на карте и внешние показатели в карточке МО."""
-    from .context import RESEARCH_NAMES
-    research = {name: context['research'][name] for name in ATLAS_RESEARCH if name in context['research']}
+    """Внешние показатели и оси исследовательского модуля для карточки МО (строки по dynamic_ids)."""
     national = context['national']
-    group_names = {}
-    for name in ['research_kmeans_v5', 'research_anchored_real']:
-        if name in research:
-            frame = pd.DataFrame(dict(label=research[name][-1], type=national.national_type.to_numpy()))
-            mapping = frame.dropna().groupby('label').type.agg(lambda values: values.mode().iat[0])
-            group_names[name] = {int(label): title for label, title in mapping.items()}
     per_mo = context['per_mo']
-    columns = ['Население 2024, тыс.', 'Реальный рост трат (ИПЦ региона), %', 'Ускорение во II пол. 2024, п.п.',
-               'Индекс доступности рынков', 'Индекс мобильности 2024, км (СЗФО)', 'Ночные огни VIIRS на жителя (log)']
     rows = []
-    for position, territory in enumerate(results['ids']):
+    for position in range(len(results['ids'])):
         boom = per_mo['Оборонно-промышленный рост зарплат (БДМО)'].iat[position]
         rows.append([
             national.national_type.iat[position], national.within_region_type.iat[position],
             per_mo['export_sector'].fillna('нет').iat[position],
             None if pd.isna(boom) else ('да' if boom else 'нет'),
-            *[per_mo[column].iat[position] for column in columns],
+            *[per_mo[column].iat[position] for column in CONTEXT_COLUMNS],
         ])
     return dict(
-        method_names=RESEARCH_NAMES, group_names=group_names,
         context_labels=['Национальный тип (исследование)', 'Положение внутри региона (исследование)',
-                        'Экспортная отрасль', 'Оборонно-промышленный рост зарплат', *columns],
+                        'Экспортная отрасль', 'Оборонно-промышленный рост зарплат', *CONTEXT_COLUMNS],
         context_mo=rows,
     )
 
@@ -114,11 +154,12 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
     """Сохранить atlas_data.json и автономный atlas.html без внешних библиотек."""
     panel = results['panel']
     geometry_path = config['data_dir'] / 'processed/municipal_geometry/teammate_data_map.json'
+    views = temporal_views(results, edges, output_dir, config)
     atlas = dict(
-        ids=panel['ids_all'], dynamic_ids=panel['ids'], months=results['months'],
-        default_method=METHOD, names=panel['coverage']['name'].tolist(),
-        regions=panel['coverage']['region_name'].tolist(), sequences={**results['sequences'], **(context_research(results))},
-        total=panel['total'][12:], categories=panel['categories'], shares=panel['shares'][12:],
+        ids=panel['ids_all'], dynamic_ids=panel['ids'],
+        names=panel['coverage']['name'].tolist(),
+        regions=panel['coverage']['region_name'].tolist(),
+        total=panel['total'], categories=panel['categories'], shares=panel['shares'],
         economic_labels=[
             'Начисленная зарплата 2024, ₽', 'Обследуемые работники на 1000 жителей',
             'Доля работников сельского/лесного хозяйства', 'Доля работников обработки',
@@ -126,14 +167,15 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
         ],
         economic_observed=results['economic_observed'].to_numpy(),
         geo=json.loads(geometry_path.read_text(encoding='utf-8')),
-        graph_xy=graph_xy, graph_edges=edges, comparison=results['comparison'].to_dict('records'),
+        graph_xy=graph_xy, comparison=results['comparison'].to_dict('records'),
         selected_k=results['selected_k'], cluster_study=results['cluster_study'].to_dict('records'),
         cluster_profiles=results['cluster_profiles'].query('year == 2024').to_dict('records'),
+        **views,
     )
     context = results.get('context')
     if context is not None:
         atlas.update(context_layers(results, context))
-    data = json.dumps(clean_json(atlas), ensure_ascii=False, allow_nan=False)
+    data = json.dumps(clean_json(atlas), ensure_ascii=False, allow_nan=False, separators=(',', ':'))
     (output_dir / 'atlas_data.json').write_text(data, encoding='utf-8')
     html = (TEMPLATES / 'atlas.html').read_text(encoding='utf-8')
     css = (TEMPLATES / 'atlas.css').read_text(encoding='utf-8')
