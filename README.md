@@ -10,7 +10,44 @@
 
 ## Быстрый запуск
 
-Проверено на Python 3.13. Запускайте команды из корня проекта. В Windows не требуется активация окружения:
+Проверено на Python 3.13. После клонирования репозитория запускайте команды из корня проекта.
+
+### Получение данных
+
+Скачайте [data-v1.zip из релиза v1.0.0](https://github.com/the-romantic-dev/sber_index_2026/releases/download/v1.0.0/data-v1.zip) (около 7,8 МБ) и распакуйте **в корень проекта**. Архив уже содержит папку `data/`: при распаковке в неё получится лишний уровень `data/data/`. [Страница релиза](https://github.com/the-romantic-dev/sber_index_2026/releases/tag/v1.0.0).
+
+В Windows скачивание и распаковку можно выполнить в PowerShell:
+
+```powershell
+$dataArchive = Join-Path $env:TEMP 'sber-index-data-v1.zip'
+Invoke-WebRequest -Uri 'https://github.com/the-romantic-dev/sber_index_2026/releases/download/v1.0.0/data-v1.zip' -OutFile $dataArchive
+Expand-Archive -LiteralPath $dataArchive -DestinationPath . -Force
+```
+
+В Linux/macOS:
+
+```bash
+curl -fL 'https://github.com/the-romantic-dev/sber_index_2026/releases/download/v1.0.0/data-v1.zip' -o /tmp/sber-index-data-v1.zip
+unzip -o /tmp/sber-index-data-v1.zip -d .
+```
+
+Повторная распаковка заменяет одноимённые файлы в `data/`. Правильная структура после распаковки:
+
+```text
+config.json
+solution/
+data/
+  raw/sberindex/consumption.parquet
+  processed/municipalities/mo.parquet
+  processed/municipal_geometry/teammate_data_map.json
+  processed/economic_features/...
+```
+
+Состав входов и их назначение описаны в [data/README.md](data/README.md). Данные, архив исследований и генерируемые результаты исключены из Git. После получения архива расчёт использует только локальные файлы.
+
+### Запуск расчёта
+
+В Windows не требуется активация окружения:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -19,8 +56,6 @@ py -3.13 -m venv .venv
 ```
 
 В Linux/macOS используйте `python3.13 -m venv .venv` и `.venv/bin/python` в следующих командах.
-
-Входы должны находиться в `data/` по путям из [описания данных](data/README.md). Они уже присутствуют в рабочей папке. Данные, архивы и генерируемые результаты исключены из Git: после отдельного получения кода положите подготовленные входы в `data/`. Расчёт читает локальные файлы, загрузка из сети не требуется.
 
 После запуска откройте `notebook_results/atlas.html`: это автономная **интерактивная презентация** с экономическими описаниями, графиком выбора K, картой, графом сходства и переключением месяцев. Файл работает без сервера и внешних библиотек.
 
