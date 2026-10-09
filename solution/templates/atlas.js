@@ -274,6 +274,10 @@ function card(k, month) {
         D.shares[month][row][column] === null ? 'нет наблюдения' : fmt(100 * D.shares[month][row][column]) + ' %']));
     if (dynamicRow !== undefined) {
         html += '<h3>Экономическая проверка · годовые данные 2024</h3>' + table(D.economic_labels.map((title, column) => [title, fmt(D.economic_observed[dynamicRow][column])]));
+        if (D.context_mo) html += '<h3>Контекст · официальные данные и исследование</h3>' + table(D.context_labels.map((title, column) => {
+            const value = D.context_mo[dynamicRow][column];
+            return [title, typeof value === 'number' ? fmt(value) : (value ?? 'нет наблюдения')];
+        }));
         html += '<p class="small">Годовые данные 2024 служат проверкой групп и не меняются при выборе месяца. Отраслевые доли относятся к обследуемым работникам без МСП; значения от 0 до 1. Зарплата работников не равна доходам жителей.</p>';
     }
     $('details').innerHTML = html;

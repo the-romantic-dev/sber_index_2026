@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from scipy import sparse
 from sklearn import __version__ as sklearn_version
 from sklearn.decomposition import PCA
@@ -123,6 +124,32 @@ def presentation_summary(results, config, output_dir):
     </section>'''
 
 
+CONTEXT_COLUMNS = [
+    'Население 2024, тыс.', 'Реальный рост трат (ИПЦ региона), %', 'Ускорение во II пол. 2024, п.п.',
+    'Индекс доступности рынков', 'Индекс мобильности 2024, км (СЗФО)', 'Ночные огни VIIRS на жителя (log)',
+]
+
+
+def context_layers(results, context):
+    """Внешние показатели и оси исследовательского модуля для карточки МО (строки по dynamic_ids)."""
+    national = context['national']
+    per_mo = context['per_mo']
+    rows = []
+    for position in range(len(results['ids'])):
+        boom = per_mo['Оборонно-промышленный рост зарплат (БДМО)'].iat[position]
+        rows.append([
+            national.national_type.iat[position], national.within_region_type.iat[position],
+            per_mo['export_sector'].fillna('нет').iat[position],
+            None if pd.isna(boom) else ('да' if boom else 'нет'),
+            *[per_mo[column].iat[position] for column in CONTEXT_COLUMNS],
+        ])
+    return dict(
+        context_labels=['Национальный тип (исследование)', 'Положение внутри региона (исследование)',
+                        'Экспортная отрасль', 'Оборонно-промышленный рост зарплат', *CONTEXT_COLUMNS],
+        context_mo=rows,
+    )
+
+
 def write_atlas(results, graph_xy, edges, output_dir, config):
     """Сохранить atlas_data.json и автономный atlas.html без внешних библиотек."""
     panel = results['panel']
@@ -145,6 +172,9 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
         cluster_profiles=results['cluster_profiles'].query('year == 2024').to_dict('records'),
         **views,
     )
+    context = results.get('context')
+    if context is not None:
+        atlas.update(context_layers(results, context))
     data = json.dumps(clean_json(atlas), ensure_ascii=False, allow_nan=False, separators=(',', ':'))
     (output_dir / 'atlas_data.json').write_text(data, encoding='utf-8')
     html = (TEMPLATES / 'atlas.html').read_text(encoding='utf-8')
@@ -152,5 +182,6 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
     js = (TEMPLATES / 'atlas.js').read_text(encoding='utf-8')
     html = html.replace('{ATLAS_CSS}', css).replace('{ATLAS_JS}', js)
     html = html.replace('{SUMMARY}', presentation_summary(results, config, output_dir))
+    html = html.replace('{CONTEXT}', context['html'] if context is not None else '')
     html = html.replace('__DATA__', data.replace('<', r'\u003c'))
     (output_dir / 'atlas.html').write_text(html, encoding='utf-8')
