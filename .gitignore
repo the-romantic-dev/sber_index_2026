@@ -1,0 +1,17 @@
+# Local data and reproducible outputs
+/data/*
+!/data/README.md
+!/data/sources.csv
+/notebook_results/
+/archive/
+
+# Python, notebooks and editors
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.mpl-cache/
+.idea/
+.vscode/
+.DS_Store

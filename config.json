@@ -1,0 +1,41 @@
+{
+  "data_dir": "data",
+  "output_dir": "notebook_results",
+  "runtime": {"threads": 1},
+  "random_seed": 42,
+  "seeds": [42, 43, 44, 45, 46],
+  "features": {
+    "scaler_months": 9,
+    "alpha_candidates": [1.0, 0.75, 0.5, 0.25],
+    "static_clip": 5.0
+  },
+  "graph": {"neighbors": 12},
+  "clustering": {"n_init": 20, "anchored_counts": [2, 5]},
+  "study": {"counts": [2, 3, 4, 5, 6, 7, 8, 9, 10], "max_count": 20, "extension_step": 5},
+  "sensitivity": {
+    "months": [0, 5, 11],
+    "weight_factors": [0.5, 2.0],
+    "neighbors": [8, 16],
+    "noise_std": 0.03,
+    "noise_seed": 4200
+  },
+  "screening": {
+    "min_group_size": 30,
+    "min_group_fraction": 0.02,
+    "max_group_share": 0.85,
+    "min_seed_ari": 0.80,
+    "min_sensitivity_ari": 0.75,
+    "min_group_jaccard": 0.60,
+    "min_silhouette": 0.10,
+    "min_economic_separation": 0.25
+  },
+  "economics": {
+    "min_observations": 20,
+    "min_coverage": 0.50,
+    "min_supported_features": 2,
+    "description_iqr": 0.25,
+    "permutations": 1999
+  },
+  "metrics": {"silhouette_sample": 600},
+  "visualization": {"layout_iterations": 80, "figure_dpi": 110, "study_dpi": 140}
+}

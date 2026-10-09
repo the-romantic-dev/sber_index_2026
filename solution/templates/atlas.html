@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>СберИндекс · муниципалитеты</title>
+<style>
+{ATLAS_CSS}
+</style>
+
+<header>
+    <h1>Динамические соседства муниципалитетов</h1>
+    <p>Месяцы 2024 · 1774 МО · экономическое сходство, не потоки покупателей</p>
+    <p class="small">Семь потребительских координат · адаптивный граф и EWMA.
+        K выбирается по 2023; годовые показатели 2024 проверяют результат.</p>
+</header>
+
+{SUMMARY}
+
+<div class="controls" id="explore">
+    <label>Месяц <select id="month"></select></label>
+    <label>Метод <select id="method"></select></label>
+    <label>Вид
+        <select id="mode">
+            <option value="map">Карта</option>
+            <option value="graph">Граф сходства основного метода</option>
+        </select>
+    </label>
+    <button id="play">▶ По месяцам</button>
+    <input id="search" placeholder="Название или ID муниципалитета"
+        aria-label="Поиск муниципалитета">
+</div>
+
+<main>
+    <section class="visual">
+        <div id="legend"></div>
+        <div id="study" class="small"></div>
+        <svg id="map" role="img" aria-label="Карта муниципалитетов"></svg>
+        <canvas id="graph" style="display:none" aria-label="Граф экономического сходства"></canvas>
+        <div id="searchResults"></div>
+    </section>
+    <aside class="card">
+        <h2 id="name">Выберите муниципалитет</h2>
+        <div id="details">
+            <p>Нажмите на карту, узел графа или введите название.</p>
+        </div>
+    </aside>
+</main>
+
+<script>
+{ATLAS_JS}
+</script>
+</html>
