@@ -14,7 +14,7 @@
 
 ### Получение данных
 
-Скачайте [data-v1.zip из релиза v1.0.0](https://github.com/the-romantic-dev/sber_index_2026/releases/download/v1.0.0/data-v1.zip) (около 7,8 МБ) и распакуйте **в корень проекта**. Архив уже содержит папку `data/`: при распаковке в неё получится лишний уровень `data/data/`. [Страница релиза](https://github.com/the-romantic-dev/sber_index_2026/releases/tag/v1.0.0).
+Скачайте [data.zip из релиза 1.0.1](https://github.com/the-romantic-dev/sber_index_2026/releases/download/1.0.1/data.zip) (около 7,8 МБ) и распакуйте **в корень проекта**. Архив уже содержит папку `data/`: при распаковке в неё получится лишний уровень `data/data/`. [Страница релиза](https://github.com/the-romantic-dev/sber_index_2026/releases/tag/1.0.1).
 
 В Windows скачивание и распаковку можно выполнить в PowerShell:
 
