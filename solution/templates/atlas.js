@@ -20,7 +20,7 @@ let graphPositions = [];
 
 D.months.forEach((month, index) => $('month').add(new Option(month, index)));
 Object.keys(D.sequences).forEach(method => {
-    $('method').add(new Option(names[method] || `${method.startsWith('anchored_') ? 'Фиксированные прототипы' : 'Основной'} · K=${method.match(/k(\d+)/)?.[1]}`, method));
+    $('method').add(new Option((D.method_names || {})[method] || names[method] || `${method.startsWith('anchored_') ? 'Фиксированные прототипы' : 'Основной'} · K=${method.match(/k(\d+)/)?.[1]}`, method));
 });
 $('method').value = D.default_method;
 
@@ -45,6 +45,11 @@ function label(id) {
     const monthIndex = +$('month').value;
     if (row === undefined) return null;
     return D.sequences[method][monthIndex][row];
+}
+
+function groupName(method, group) {
+    const custom = (D.group_names || {})[method];
+    return custom && custom[group] !== undefined ? custom[group] : 'Группа ' + (group + 1);
 }
 
 function esc(value) {
@@ -86,7 +91,7 @@ function card() {
     const group = label(selected);
     let html = '<p>' + esc(D.regions[row]) + ' · ID ' + selected + '</p>' + table([
         ['Месяц', D.months[monthIndex]],
-        ['Группа выбранного метода', group === null ? 'нет назначения' : group + 1],
+        ['Группа выбранного метода', group === null ? 'нет назначения' : groupName($('method').value, group)],
         ['Средний безналичный расход', fmt(D.total[monthIndex][row]) + ' ₽']
     ]);
 
@@ -100,6 +105,14 @@ function card() {
     if (dynamicRow !== undefined) {
         html += '<h3>Экономическая проверка · годовые данные 2024</h3>' + table(
             D.economic_labels.map((title, column) => [title, fmt(D.economic_observed[dynamicRow][column])])
+        );
+    }
+    if (dynamicRow !== undefined && D.context_mo) {
+        html += '<h3>Контекст · официальные данные и исследование</h3>' + table(
+            D.context_labels.map((title, column) => {
+                const value = D.context_mo[dynamicRow][column];
+                return [title, typeof value === 'number' ? fmt(value) : (value ?? 'нет наблюдения')];
+            })
         );
     }
     html += '<p class="small">Годовые показатели используются только для проверки групп. '
@@ -167,7 +180,7 @@ function render() {
     });
     $('legend').textContent = [...counts]
         .sort((left, right) => left[0] - right[0])
-        .map(([group, count]) => 'Группа ' + (group + 1) + ': ' + count + ' МО')
+        .map(([group, count]) => groupName(method, group) + ': ' + count + ' МО')
         .join(' · ') + ' · Серый: нет назначения';
 
     document.querySelectorAll('#map path').forEach(path => {

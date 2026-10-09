@@ -36,6 +36,7 @@
     "description_iqr": 0.25,
     "permutations": 1999
   },
+  "context": {"enabled": true, "permutations": 999, "bootstrap": 300, "road_km": 150},
   "metrics": {"silhouette_sample": 600},
   "visualization": {"layout_iterations": 80, "figure_dpi": 110, "study_dpi": 140}
 }

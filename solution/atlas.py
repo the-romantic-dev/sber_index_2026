@@ -1,6 +1,8 @@
 """Интерактивная презентация с картой, временными группами и экономическими профилями."""
 import base64
 import json
+
+import pandas as pd
 from html import escape
 from pathlib import Path
 
@@ -65,6 +67,49 @@ def presentation_summary(results, config, output_dir):
     </section>'''
 
 
+ATLAS_RESEARCH = ['research_kmeans_v5', 'research_anchored_real', 'research_archetypes',
+                  'research_dgi', 'research_dmon', 'research_evolvegcn', 'research_gconvgru']
+
+
+def context_research(results):
+    """Метки исследовательских методов для переключателя карты (если контекст рассчитан)."""
+    context = results.get('context')
+    if context is None:
+        return {}
+    return {name: context['research'][name] for name in ATLAS_RESEARCH if name in context['research']}
+
+
+def context_layers(results, context):
+    """Слои контекстного блока: методы исследования на карте и внешние показатели в карточке МО."""
+    from .context import RESEARCH_NAMES
+    research = {name: context['research'][name] for name in ATLAS_RESEARCH if name in context['research']}
+    national = context['national']
+    group_names = {}
+    for name in ['research_kmeans_v5', 'research_anchored_real']:
+        if name in research:
+            frame = pd.DataFrame(dict(label=research[name][-1], type=national.national_type.to_numpy()))
+            mapping = frame.dropna().groupby('label').type.agg(lambda values: values.mode().iat[0])
+            group_names[name] = {int(label): title for label, title in mapping.items()}
+    per_mo = context['per_mo']
+    columns = ['Население 2024, тыс.', 'Реальный рост трат (ИПЦ региона), %', 'Ускорение во II пол. 2024, п.п.',
+               'Индекс доступности рынков', 'Индекс мобильности 2024, км (СЗФО)', 'Ночные огни VIIRS на жителя (log)']
+    rows = []
+    for position, territory in enumerate(results['ids']):
+        boom = per_mo['Оборонно-промышленный рост зарплат (БДМО)'].iat[position]
+        rows.append([
+            national.national_type.iat[position], national.within_region_type.iat[position],
+            per_mo['export_sector'].fillna('нет').iat[position],
+            None if pd.isna(boom) else ('да' if boom else 'нет'),
+            *[per_mo[column].iat[position] for column in columns],
+        ])
+    return dict(
+        method_names=RESEARCH_NAMES, group_names=group_names,
+        context_labels=['Национальный тип (исследование)', 'Положение внутри региона (исследование)',
+                        'Экспортная отрасль', 'Оборонно-промышленный рост зарплат', *columns],
+        context_mo=rows,
+    )
+
+
 def write_atlas(results, graph_xy, edges, output_dir, config):
     """Сохранить atlas_data.json и автономный atlas.html без внешних библиотек."""
     panel = results['panel']
@@ -72,7 +117,7 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
     atlas = dict(
         ids=panel['ids_all'], dynamic_ids=panel['ids'], months=results['months'],
         default_method=METHOD, names=panel['coverage']['name'].tolist(),
-        regions=panel['coverage']['region_name'].tolist(), sequences=results['sequences'],
+        regions=panel['coverage']['region_name'].tolist(), sequences={**results['sequences'], **(context_research(results))},
         total=panel['total'][12:], categories=panel['categories'], shares=panel['shares'][12:],
         economic_labels=[
             'Начисленная зарплата 2024, ₽', 'Обследуемые работники на 1000 жителей',
@@ -85,6 +130,9 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
         selected_k=results['selected_k'], cluster_study=results['cluster_study'].to_dict('records'),
         cluster_profiles=results['cluster_profiles'].query('year == 2024').to_dict('records'),
     )
+    context = results.get('context')
+    if context is not None:
+        atlas.update(context_layers(results, context))
     data = json.dumps(clean_json(atlas), ensure_ascii=False, allow_nan=False)
     (output_dir / 'atlas_data.json').write_text(data, encoding='utf-8')
     html = (TEMPLATES / 'atlas.html').read_text(encoding='utf-8')
@@ -92,5 +140,6 @@ def write_atlas(results, graph_xy, edges, output_dir, config):
     js = (TEMPLATES / 'atlas.js').read_text(encoding='utf-8')
     html = html.replace('{ATLAS_CSS}', css).replace('{ATLAS_JS}', js)
     html = html.replace('{SUMMARY}', presentation_summary(results, config, output_dir))
+    html = html.replace('{CONTEXT}', context['html'] if context is not None else '')
     html = html.replace('__DATA__', data.replace('<', r'\u003c'))
     (output_dir / 'atlas.html').write_text(html, encoding='utf-8')
